@@ -133,16 +133,18 @@ class DictWrapper(object):
     # This will make it easier to use either class in place of each other.
     # Either this, or pile everything into DataWrapper and make it able to handle all cases.
 
-    def __init__(self, xml, rootkey=None):
+    def __init__(self, xml, rootkey=None, xml_parser=None):
+        if xml_parser is None:
+            xml_parser = utils.XML2Dict().fromstring
         if isinstance(xml, bytes):
             try:
                 xml = xml.decode()
-            except:
+            except UnicodeDecodeError:
                 xml = xml
         self.original = xml
         self.response = None
         self._rootkey = rootkey
-        self._mydict = utils.XML2Dict().fromstring(remove_namespace(xml))
+        self._mydict = xml_parser(remove_namespace(xml))
         self._response_dict = self._mydict.get(list(self._mydict.keys())[0], self._mydict)
 
     @property
@@ -238,7 +240,7 @@ class MWS(object):
     ACCOUNT_TYPE = "SellerId"
 
     def __init__(self, access_key, secret_key, account_id,
-                 region='US', uri='', version='', auth_token='', proxy=None):
+                 region='US', uri='', version='', auth_token='', proxy=None, encoding=None, xml_parser=None):
         self.access_key = access_key
         self.secret_key = secret_key
         self.account_id = account_id
@@ -246,6 +248,8 @@ class MWS(object):
         self.version = version or self.VERSION
         self.uri = uri or self.URI
         self.proxy = proxy
+        self.encoding = encoding
+        self.xml_parser = xml_parser
 
         # * TESTING FLAGS * #
         self._test_request_params = False
@@ -310,7 +314,9 @@ class MWS(object):
             # to convert the dict to a url parsed string, so why do it twice if i can just pass the full url :).
             response = request(method, url, data=kwargs.get(
                 'body', ''), headers=headers, proxies=proxies, timeout=kwargs.get('timeout', 300))
-            response.encoding = 'utf-8'
+
+            if self.encoding or kwargs.get('encoding', None):
+                response.encoding = self.encoding
             response.raise_for_status()
             # When retrieving data from the response object,
             # be aware that response.content returns the content in bytes while response.text calls
@@ -322,10 +328,10 @@ class MWS(object):
             rootkey = kwargs.get('rootkey', extra_data.get("Action") + "Result")
             try:
                 try:
-                    parsed_response = DictWrapper(data, rootkey)
+                    parsed_response = DictWrapper(data, rootkey, kwargs.get('xml_parser', None) or self.xml_parser)
                 except TypeError:  # raised when using Python 3 and trying to remove_namespace()
                     # When we got CSV as result, we will got error on this
-                    parsed_response = DictWrapper(response.text, rootkey)
+                    parsed_response = DictWrapper(response.text, rootkey, kwargs.get('xml_parser', None) or self.xml_parser)
 
             except XMLError:
                 parsed_response = DataWrapper(data, response.headers)

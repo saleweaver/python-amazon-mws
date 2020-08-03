@@ -157,7 +157,7 @@ class Reports(MWS):
         data.update(utils.enumerate_param('ReportTypeList.Type.', report_types))
         return self.make_request(data)
 
-    def get_report(self, report_id):
+    def get_report(self, report_id, encoding=None):
         """
         Returns the contents of a report and the Content-MD5 header for the returned report body.
 
@@ -168,7 +168,7 @@ class Reports(MWS):
             'Action': 'GetReport',
             'ReportId': report_id,
         }
-        return self.make_request(data)
+        return self.make_request(data, encoding=encoding)
 
     def manage_report_schedule(self, report_type, schedule, schedule_date=None):
         data = {
